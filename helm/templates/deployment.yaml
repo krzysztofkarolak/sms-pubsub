@@ -54,18 +54,22 @@ spec:
               valueFrom:
                 secretKeyRef:
                   key: GOOGLE_PROJECT_NAME
+                  name: {{ .Values.secretName }}
             - name: SSH_HOST
               valueFrom:
                 secretKeyRef:
                   key: SSH_HOST
+                  name: {{ .Values.secretName }}
             - name: SSH_USER
               valueFrom:
                 secretKeyRef:
                   key: SSH_USER
+                  name: {{ .Values.secretName }}
             - name: MODEM_PORT
               valueFrom:
                 secretKeyRef:
                   key: MODEM_PORT
+                  name: {{ .Values.secretName }}
 
           resources:
             requests:
