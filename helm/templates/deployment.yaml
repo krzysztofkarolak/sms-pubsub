@@ -65,6 +65,11 @@ spec:
                 secretKeyRef:
                   key: SSH_USER
                   name: {{ .Values.secretName }}
+            - name: SSH_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: SSH_PRIVATE_KEY
+                  name: { { .Values.secretName } }
             - name: MODEM_PORT
               valueFrom:
                 secretKeyRef:
