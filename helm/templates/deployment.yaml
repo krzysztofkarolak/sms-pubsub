@@ -69,7 +69,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   key: SSH_PRIVATE_KEY
-                  name: { { .Values.secretName } }
+                  name: {{ .Values.secretName }}
             - name: MODEM_PORT
               valueFrom:
                 secretKeyRef:
