@@ -1,0 +1,77 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.appName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+      app.kubernetes.io/name: {{ .Values.appName }}
+  annotations:
+    source_url: "git@github.com:krzysztofkarolak/sms-pubsub-ssh.git"
+spec:
+  replicas: 1
+  minReadySeconds: 10
+  progressDeadlineSeconds: 60
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.appName }}
+
+  template:
+    metadata:
+      name: {{ .Values.appName }}
+      namespace: {{ .Values.namespace }}
+      labels:
+        app.kubernetes.io/name: {{ .Values.appName }}
+      annotations:
+        source_url: "git@github.com:krzysztofkarolak/sms-pubsub-ssh.git"
+    spec:
+      nodeSelector:
+        beta.kubernetes.io/arch: amd64
+
+      restartPolicy: Always
+
+      imagePullSecrets:
+        - name: {{ .Values.registrySecretName }}
+
+      containers:
+        - name: sms-pubsub-ssh
+          image: {{ .Values.image }}
+          imagePullPolicy: IfNotPresent
+
+          env:
+            - name: GOOGLE_SERVICE_ACCOUNT_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: GOOGLE_SERVICE_ACCOUNT_KEY
+                  name: {{ .Values.secretName }}
+            - name: PUBSUB_SUBSCRIPTION_NAME
+              valueFrom:
+                secretKeyRef:
+                  key: PUBSUB_SUBSCRIPTION_NAME
+                  name: {{ .Values.secretName }}
+            - name: GOOGLE_PROJECT_NAME
+              valueFrom:
+                secretKeyRef:
+                  key: GOOGLE_PROJECT_NAME
+            - name: SSH_HOST
+              valueFrom:
+                secretKeyRef:
+                  key: SSH_HOST
+            - name: SSH_USER
+              valueFrom:
+                secretKeyRef:
+                  key: SSH_USER
+            - name: MODEM_PORT
+              valueFrom:
+                secretKeyRef:
+                  key: MODEM_PORT
+
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "20m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+
