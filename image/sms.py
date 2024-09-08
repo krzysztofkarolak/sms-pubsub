@@ -32,6 +32,9 @@ modem_port = os.environ.get("MODEM_PORT")
 if not ssh_private_key:
     raise ValueError("SSH private key not found in the environment variable.")
 
+def shrink_string(s):
+    return s[:56] + '...' if len(s) > 59 else s
+
 def process_message(phone_number, text_message):
     try:
         ssh_client = paramiko.SSHClient()
@@ -69,7 +72,7 @@ def callback(message):
     try:
         data = json.loads(message.data.decode('utf-8'))
         phone_number = data.get('phone_number')
-        text_message = data.get('text_message')
+        text_message = shrink_string(data.get('text_message'))
 
         if phone_number and text_message:
             print(f"Received message for phone number: {phone_number}")
