@@ -75,6 +75,8 @@ spec:
                 secretKeyRef:
                   key: MODEM_PORT
                   name: {{ .Values.secretName }}
+            - name: CHAR_LIMIT
+              value: {{ .Values.smsCharacterLimit }}
 
           resources:
             requests:

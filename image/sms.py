@@ -29,11 +29,12 @@ ssh_port = 22
 ssh_user = os.environ.get("SSH_USER")
 ssh_private_key = os.environ.get("SSH_PRIVATE_KEY")
 modem_port = os.environ.get("MODEM_PORT")
+char_limit = int(os.environ.get("CHAR_LIMIT"))
 if not ssh_private_key:
     raise ValueError("SSH private key not found in the environment variable.")
 
 def shrink_string(s):
-    return s[:56] + '...' if len(s) > 59 else s
+    return s[:char_limit] + '...' if len(s) > char_limit else s
 
 def process_message(phone_number, text_message):
     try:
