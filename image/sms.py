@@ -5,23 +5,30 @@ from google.cloud import pubsub_v1
 from google.oauth2 import service_account
 import json
 from concurrent.futures import TimeoutError
+import threading
+import time
+import logging
+import sys
 
-# Retrieve the service account JSON from the environment variable
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
 sa_key_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_KEY")
-
 if not sa_key_json:
     raise ValueError("Service account key not found in the environment variable.")
 
-# Convert the JSON string to a dictionary
 sa_key_dict = json.loads(sa_key_json)
-
-# Create credentials using the loaded service account key JSON
 credentials = service_account.Credentials.from_service_account_info(sa_key_dict)
 
-# Google Cloud Pub/Sub subscription settings
 project_id = os.environ.get("GOOGLE_PROJECT_NAME")
 subscription_id = os.environ.get("PUBSUB_SUBSCRIPTION_NAME")
-timeout = None  # Time to listen for messages. Set to None to listen indefinitely.
+timeout = None
+lock = threading.Lock()
 
 # SSH settings
 ssh_host = os.environ.get("SSH_HOST")
@@ -42,11 +49,9 @@ def process_message(phone_number, text_message):
         ssh_client.load_system_host_keys()
         ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-        # Load private key from environment variable
         private_key_file = io.StringIO(ssh_private_key)
         private_key = paramiko.RSAKey.from_private_key(private_key_file)
 
-        # Connect to the SSH server using the private key from memory
         ssh_client.connect(ssh_host, port=ssh_port, username=ssh_user, pkey=private_key)
 
         command = f"sms_tool -d {modem_port} send 48{phone_number} '{text_message}'"
@@ -56,50 +61,54 @@ def process_message(phone_number, text_message):
         error = stderr.read().decode()
 
         if output:
-            print(f"Command output: {output}")
+            logging.info(f"Command output: {output}")
         if error:
-            print(f"Command error: {error}")
+            logging.error(f"Command error: {error}")
 
         ssh_client.close()
         return error == ""
     except paramiko.SSHException as e:
-        print(f"SSH error: {e}")
+        logging.error(f"SSH error: {e}")
         return False
     except Exception as e:
-        print(f"Error processing the message: {e}")
+        logging.error(f"Error processing the message: {e}")
         return False
+
 
 def callback(message):
-    try:
-        data = json.loads(message.data.decode('utf-8'))
-        phone_number = data.get('phone_number')
-        text_message = shrink_string(data.get('text_message'))
+    with lock:
+        try:
+            data = json.loads(message.data.decode('utf-8'))
+            phone_number = data.get('phone_number')
+            text_message = shrink_string(data.get('text_message'))
 
-        if phone_number and text_message:
-            print(f"Received message for phone number: {phone_number}")
+            if phone_number and text_message:
+                logging.info(f"Received message for phone number: {phone_number}")
 
-            success = process_message(phone_number, text_message)
-            if success:
-                message.ack()  # Acknowledge the message after successful processing
+                success = process_message(phone_number, text_message)
+                if success:
+                    message.ack()  # Acknowledge the message after successful processing
+                else:
+                    logging.error(f"Failed to process message for phone number: {phone_number}. Nack-ing the message.")
+                    message.nack()  # Negatively acknowledge if SSH fails
             else:
-                print(f"Failed to process message for phone number: {phone_number}. Nack-ing the message.")
-                message.nack()  # Negatively acknowledge if SSH fails
-        else:
-            print("Message is missing phone number or text message. Ignoring.")
+                logging.error("Message is missing phone number or text message. Ignoring.")
+                message.nack()
+        except json.JSONDecodeError as e:
+            logging.error(f"JSON decoding error: {e}")
+            message.ack()
+        except Exception as e:
+            logging.error(f"Error in callback: {e}")
             message.nack()
-    except json.JSONDecodeError as e:
-        print(f"JSON decoding error: {e}")
-        message.ack()
-    except Exception as e:
-        print(f"Error in callback: {e}")
-        message.nack()
+
+        time.sleep(5)
 
 def listen_for_messages():
     subscriber = pubsub_v1.SubscriberClient(credentials=credentials)
     subscription_path = subscriber.subscription_path(project_id, subscription_id)
 
     streaming_pull_future = subscriber.subscribe(subscription_path, callback=callback)
-    print(f"Listening for messages on {subscription_path}...")
+    logging.info(f"Listening for messages on {subscription_path}...")
 
     try:
         streaming_pull_future.result(timeout=timeout)
@@ -107,7 +116,7 @@ def listen_for_messages():
         streaming_pull_future.cancel()
         streaming_pull_future.result()
     except Exception as e:
-        print(f"An error occurred while listening for messages: {e}")
+        logging.error(f"An error occurred while listening for messages: {e}")
     finally:
         subscriber.close()
 
@@ -115,6 +124,6 @@ if __name__ == "__main__":
     try:
         listen_for_messages()
     except KeyboardInterrupt:
-        print("Interrupted by user. Shutting down...")
+        logging.error("Interrupted by user. Shutting down...")
     except Exception as e:
-        print(f"An error occurred in the main loop: {e}")
+        logging.error(f"An error occurred in the main loop: {e}")
