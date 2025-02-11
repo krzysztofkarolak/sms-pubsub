@@ -1,6 +1,10 @@
 image: ""
 secretName: "sms-secrets"
 registrySecretName: ""
-appName: "sms-pubsub-ssh"
+appName: "sms-pubsub"
 namespace: "sms"
 smsCharacterLimit: "155"
+sendMode: "ssh"
+nodeSelector:
+  enabled: false
+  hostname: ""

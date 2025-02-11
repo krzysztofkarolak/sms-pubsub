@@ -7,7 +7,7 @@ metadata:
   labels:
       app.kubernetes.io/name: {{ .Values.appName }}
   annotations:
-    source_url: "git@github.com:krzysztofkarolak/sms-pubsub-ssh.git"
+    source_url: "git@github.com:krzysztofkarolak/sms-pubsub.git"
 spec:
   replicas: 1
   minReadySeconds: 10
@@ -24,10 +24,12 @@ spec:
       labels:
         app.kubernetes.io/name: {{ .Values.appName }}
       annotations:
-        source_url: "git@github.com:krzysztofkarolak/sms-pubsub-ssh.git"
+        source_url: "git@github.com:krzysztofkarolak/sms-pubsub.git"
     spec:
+      {{- if .Values.nodeSelector.enabled }}
       nodeSelector:
-        beta.kubernetes.io/arch: amd64
+        kubernetes.io/hostname: {{ .Values.nodeSelector.hostname | quote }}
+      {{- end }}
 
       restartPolicy: Always
 
@@ -35,7 +37,7 @@ spec:
         - name: {{ .Values.registrySecretName }}
 
       containers:
-        - name: sms-pubsub-ssh
+        - name: sms-pubsub
           image: {{ .Values.image }}
           imagePullPolicy: IfNotPresent
 
@@ -77,6 +79,8 @@ spec:
                   name: {{ .Values.secretName }}
             - name: CHAR_LIMIT
               value: {{ .Values.smsCharacterLimit }}
+            - name: SEND_MODE
+              value: {{ .Values.sendMode }}
 
           resources:
             requests:
