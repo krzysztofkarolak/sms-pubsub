@@ -5,6 +5,7 @@ appName: "sms-pubsub"
 namespace: "sms"
 smsCharacterLimit: "155"
 sendMode: "ssh"
+replicaCount: 1
 nodeSelector:
   enabled: false
   hostname: ""
