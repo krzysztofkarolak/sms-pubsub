@@ -54,7 +54,7 @@ def process_message_ssh(phone_number, text_message):
         private_key_file = io.StringIO(ssh_private_key)
         private_key = paramiko.RSAKey.from_private_key(private_key_file)
 
-        ssh_client.connect(ssh_host, port=ssh_port, username=ssh_user, pkey=private_key)
+        ssh_client.connect(ssh_host, port=ssh_port, username=ssh_user, pkey=private_key, timeout=10)
 
         command = f"sms_tool -d {modem_port} send 48{phone_number} '{text_message}'"
         stdin, stdout, stderr = ssh_client.exec_command(command)
