@@ -10,7 +10,6 @@ metadata:
     source_url: "git@github.com:krzysztofkarolak/sms-pubsub.git"
 spec:
   minReadySeconds: 10
-  progressDeadlineSeconds: 60
 
   selector:
     matchLabels:
