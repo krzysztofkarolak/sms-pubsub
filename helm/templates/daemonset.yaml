@@ -26,7 +26,7 @@ spec:
     spec:
       {{- if .Values.nodeSelector.enabled }}
       nodeSelector:
-        kubernetes.io/hostname: {{ .Values.nodeSelector.hostname | quote }}
+        kubernetes.io/arch: {{ .Values.nodeSelector.arch | quote }}
       {{- end }}
 
       restartPolicy: Always
