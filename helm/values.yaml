@@ -6,5 +6,5 @@ namespace: "sms"
 smsCharacterLimit: "155"
 sendMode: "ssh"
 nodeSelector:
-  enabled: true
-  arch: "amd64"
+  enabled: false
+  arch: ""
