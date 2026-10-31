@@ -1,5 +1,6 @@
 import os
 import io
+import shlex
 import paramiko
 import subprocess
 from google.cloud import pubsub_v1
@@ -39,7 +40,7 @@ ssh_private_key = os.environ.get("SSH_PRIVATE_KEY")
 modem_port = os.environ.get("MODEM_PORT")
 send_mode = os.environ.get("SEND_MODE")
 char_limit = int(os.environ.get("CHAR_LIMIT"))
-if not ssh_private_key and send_mode == "ssh":
+if not ssh_private_key and send_mode in ("ssh", "mmcli"):
     raise ValueError("SSH private key not found in the environment variable.")
 
 def shrink_string(s):
@@ -76,7 +77,49 @@ def process_message_ssh(phone_number, text_message):
     except Exception as e:
         logging.error(f"Error processing the message: {e}")
         return False
-    
+
+def process_message_mmcli(phone_number, text_message):
+    ssh_client = paramiko.SSHClient()
+    try:
+        ssh_client.load_system_host_keys()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        private_key_file = io.StringIO(ssh_private_key)
+        private_key = paramiko.RSAKey.from_private_key(private_key_file)
+
+        ssh_client.connect(ssh_host, port=ssh_port, username=ssh_user, pkey=private_key, timeout=10)
+
+        safe_text = text_message.replace("'", "`")
+        create_arg = f"--messaging-create-sms=text='{safe_text}',number='+48{phone_number}'"
+        command = (
+            f"id=$(mmcli -m any {shlex.quote(create_arg)} | grep -o '/SMS/[0-9]*' | cut -d/ -f3); "
+            f"[ -n \"$id\" ] || {{ echo 'SMS create failed' >&2; exit 1; }}; "
+            f"mmcli -s \"$id\" --send; rc=$?; "
+            f"mmcli -m any --messaging-delete-sms=\"$id\" >/dev/null 2>&1; "
+            f"exit $rc"
+        )
+        stdin, stdout, stderr = ssh_client.exec_command(command, timeout=60)
+
+        exit_status = stdout.channel.recv_exit_status()
+        output = stdout.read().decode()
+        error = stderr.read().decode()
+
+        if output:
+            logging.info(f"Command output: {output}")
+        if exit_status != 0:
+            logging.error(f"Command error (exit {exit_status}): {error}")
+            return False
+
+        return True
+    except paramiko.SSHException as e:
+        logging.error(f"SSH error: {e}")
+        return False
+    except Exception as e:
+        logging.error(f"Error processing the message: {e}")
+        return False
+    finally:
+        ssh_client.close()
+
 def process_message_hilink(phone_number, text_message):
     command = f"hlcli smssend -to={phone_number} -msg='{text_message}'"
     try:
@@ -108,7 +151,10 @@ def callback(message):
             if phone_number and text_message:
                 logging.info(f"Received message for phone number: {phone_number}")
 
-                process_message = process_message_hilink if send_mode == "hilink" else process_message_ssh
+                process_message = {
+                    "hilink": process_message_hilink,
+                    "mmcli": process_message_mmcli,
+                }.get(send_mode, process_message_ssh)
                 success = process_message(phone_number, text_message)
                 if success:
                     message.ack()  # Acknowledge the message after successful processing

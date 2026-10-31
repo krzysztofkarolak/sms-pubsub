@@ -1,7 +1,7 @@
 # SMS Gateway for Pub/Sub
 
 Currently it supports sending SMS received from Pub/Sub subscription by:
-- SSH (using Openwrt sms_tool)
+- SSH (using Openwrt sms_tool or nmcli)
 - Hilink API
 
 ### Contributing
